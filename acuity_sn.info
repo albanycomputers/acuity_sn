@@ -1,0 +1,5 @@
+name = Acuity Serial Number Generator
+description = Provides atomic, reusable serial number generation for Backdrop CMS modules.
+type = module
+core = 1.x
+package = Acuity

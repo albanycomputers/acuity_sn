@@ -1,0 +1,25 @@
+<?php
+
+/**
+ * @file
+ * Acuity Serial Number Generator module.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function acuity_sn_menu() {
+  $items = [];
+
+  // Help page under ABMS path.
+  $items['admin/config/abms/acuity_sn/help'] = [
+    'title' => 'Acuity SN Help',
+    'description' => 'Help and support for the Acuity Serial Number Generator module.',
+    'page callback' => 'acuity_sn_help_page',
+    'access arguments' => ['administer site configuration'],
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'acuity_sn.admin.inc',
+  ];
+
+  return $items;
+}

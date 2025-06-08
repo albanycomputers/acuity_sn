@@ -1,0 +1,11 @@
+Acuity Serial Number Generator - CHANGELOG
+
+Version 1.x-1.0 (initial release)
+- Initial structure and test serial group
+- Provides API hooks and install/uninstall
+- Sets groundwork for atomic serial number generation
+
+Next planned features:
+- Lock-safe generator function with jitter retry
+- Format helper
+- Admin config form for serial management

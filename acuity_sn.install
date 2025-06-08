@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function acuity_sn_install() {
+  // Start with a test serial group for development.
+  config_set('acuity_sn.serials', [
+    'test_serial' => [
+      'prefix' => 'T-',
+      'suffix' => '',
+      'padding' => 4,
+      'min' => 1,
+      'next' => 1,
+    ],
+  ]);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function acuity_sn_uninstall() {
+  config_clear('acuity_sn.serials');
+}
