@@ -15,7 +15,7 @@ function acuity_sn_field_widget_form($form, &$form_state, $field, $instance, $la
   $group_name = $instance['widget']['settings']['group'] ?? '';
   $preview = '';
 
-  // Check if this is a new node
+  // Check if this is a new entity
   $is_new = isset($form['#node']) && empty($form['#node']->nid);
 
   if (!empty($group_name) && $is_new) {
@@ -24,23 +24,35 @@ function acuity_sn_field_widget_form($form, &$form_state, $field, $instance, $la
 
     if (isset($all[$group_name])) {
       $next = acuity_sn_peek_next_number($group_name);
-      $preview = acuity_sn_format_number($all[$group_name], $next) . ' (provisional)';
+      $preview = acuity_sn_format_number($all[$group_name], $next);
     }
   }
   else {
-    // If not new or group is missing, preserve existing field value
+    // Use existing field value
     $preview = $items[$delta]['value'] ?? '';
   }
 
-  $element += [
+  // Main serial number field (read-only)
+  $element['value'] = [
     '#type' => 'textfield',
+    '#title' => t('Serial Number'),
     '#default_value' => $preview,
     '#attributes' => ['readonly' => 'readonly', 'style' => 'color: red; font-style: italic;'],
-    '#description' => t('This is a provisional number and will be finalized when the item is saved.'),
+  ];
+
+  if ($is_new) {
+    $element['value']['#description'] = '<span class="abms-sn-provisional-msg">' . t('This is a provisional number and may change once this has been saved.') . '</span>';
+  }
+
+  // Hidden backup field to preserve value during edit
+  $element['preserve'] = [
+    '#type' => 'hidden',
+    '#value' => $preview,
   ];
 
   return $element;
 }
+
 
 
 

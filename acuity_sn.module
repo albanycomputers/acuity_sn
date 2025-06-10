@@ -4,30 +4,46 @@
 // Include the field/widget logic.
 module_load_include('inc', 'acuity_sn', 'acuity_sn.field');
 module_load_include('inc', 'acuity_sn', 'acuity_sn.admin');
+module_load_include('inc', 'acuity_sn', 'acuity_sn.api');
+
+
 
 
 /**
- * Implements hook_node_presave().
+ * Implements hook_entity_presave().
  */
-function acuity_sn_node_presave($node) {
-  foreach (field_info_instances('node', $node->type) as $field_name => $instance) {
+function acuity_sn_entity_presave($entity, $entity_type) {
+  // Skip if entity type doesn't support bundles.
+  if (!isset($entity->type)) {
+    return;
+  }
+
+  foreach (field_info_instances($entity_type, $entity->type) as $field_name => $instance) {
     $field = field_info_field($field_name);
 
     if ($field['type'] === 'text' && $instance['widget']['type'] === 'acuity_sn_widget') {
       $lang = LANGUAGE_NONE;
-      $existing_value = $node->{$field_name}[$lang][0]['value'] ?? '';
       $group_name = $instance['widget']['settings']['group'] ?? '';
 
-      // Only assign if it's a new node and the field is empty
-      if (empty($node->nid) && empty($existing_value) && !empty($group_name)) {
+      // Check if it's a new entity. Use is_new() if available, fallback otherwise.
+      $is_new = method_exists($entity, 'is_new') ? $entity->is_new() : (empty($entity->nid) && empty($entity->id));
+
+      if ($is_new && !empty($group_name)) {
         $value = acuity_sn_generate_number($group_name);
         if ($value) {
-          $node->{$field_name}[$lang][0]['value'] = $value;
+          $entity->{$field_name}[$lang][0]['value'] = $value;
         }
+      }
+      // Otherwise, restore value from hidden field to avoid data loss
+      elseif (isset($_POST[$field_name]['preserve'])) {
+        $entity->{$field_name}[$lang][0]['value'] = $_POST[$field_name]['preserve'];
       }
     }
   }
 }
+
+
+
 
 /**
  * Generate the next sequence number for a group.

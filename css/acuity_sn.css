@@ -6,3 +6,9 @@
 .abms-delete-link:hover {
   text-decoration: underline;
 }
+
+
+.abms-sn-provisional-msg {
+  color: red;
+  font-style: italic;
+}
