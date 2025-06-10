@@ -1,25 +1,136 @@
 <?php
 
+
+// Include the field/widget logic.
+module_load_include('inc', 'acuity_sn', 'acuity_sn.field');
+module_load_include('inc', 'acuity_sn', 'acuity_sn.admin');
+
+
 /**
- * @file
- * Acuity Serial Number Generator module.
+ * Implements hook_node_presave().
  */
+function acuity_sn_node_presave($node) {
+  foreach (field_info_instances('node', $node->type) as $field_name => $instance) {
+    $field = field_info_field($field_name);
+
+    if ($field['type'] === 'text' && $instance['widget']['type'] === 'acuity_sn_widget') {
+      $lang = LANGUAGE_NONE;
+      $existing_value = $node->{$field_name}[$lang][0]['value'] ?? '';
+      $group_name = $instance['widget']['settings']['group'] ?? '';
+
+      // Only assign if it's a new node and the field is empty
+      if (empty($node->nid) && empty($existing_value) && !empty($group_name)) {
+        $value = acuity_sn_generate_number($group_name);
+        if ($value) {
+          $node->{$field_name}[$lang][0]['value'] = $value;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Generate the next sequence number for a group.
+ */
+function acuity_sn_generate_number($group) {
+  $lock_name = 'acuity_sn_' . $group;
+
+  if (!lock_acquire($lock_name, 5.0)) {
+    watchdog('acuity_sn', 'Could not acquire lock for group: %group', ['%group' => $group], WATCHDOG_ERROR);
+    return NULL;
+  }
+
+  $config = config('acuity_sn.serials');
+  $all = $config->get();
+
+  if (!isset($all[$group])) {
+    watchdog('acuity_sn', 'No serial group found for: %group', ['%group' => $group], WATCHDOG_ERROR);
+    lock_release($lock_name);
+    return NULL;
+  }
+
+  $group_data = $all[$group];
+  $next = max($group_data['next'], $group_data['min']);
+  $formatted = $group_data['prefix']
+             . str_pad($next, $group_data['padding'], '0', STR_PAD_LEFT)
+             . $group_data['suffix'];
+
+  $group_data['next'] = $next + 1;
+  $all[$group] = $group_data;
+  $config->setData($all)->save();
+
+  lock_release($lock_name);
+  return $formatted;
+}
 
 /**
  * Implements hook_menu().
  */
 function acuity_sn_menu() {
-  $items = [];
+$items = [];
 
-  // Help page under ABMS path.
-  $items['admin/config/abms/acuity_sn/help'] = [
-    'title' => 'Acuity SN Help',
-    'description' => 'Help and support for the Acuity Serial Number Generator module.',
-    'page callback' => 'acuity_sn_help_page',
+  $items['admin/config/abms/acuity_sn'] = [
+    'title' => 'Serial Number Settings',
+    'description' => 'Manage serial number formats for the ABMS suite.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => ['acuity_sn_admin_form'],
     'access arguments' => ['administer site configuration'],
-    'type' => MENU_NORMAL_ITEM,
     'file' => 'acuity_sn.admin.inc',
+  ];
+
+  $items['admin/config/abms/acuity_sn/add'] = [
+    'title' => 'Add Serial Group',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => ['acuity_sn_group_form'],
+    'access arguments' => ['administer site configuration'],
+    'type' => MENU_CALLBACK,
+    'file' => 'acuity_sn.admin.inc',
+  ];
+
+  $items['admin/config/abms/acuity_sn/edit/%'] = [
+    'title' => 'Edit Serial Group',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => ['acuity_sn_group_form', 5],
+    'access arguments' => ['administer site configuration'],
+    'type' => MENU_CALLBACK,
+    'file' => 'acuity_sn.admin.inc',
+  ];
+
+  $items['admin/config/abms/acuity_sn/delete/%'] = [
+    'title' => 'Delete Serial Group',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => ['acuity_sn_group_delete_confirm', 5],
+    'access arguments' => ['administer site configuration'],
+    'type' => MENU_CALLBACK,
+    'file' => 'acuity_sn.admin.inc',
+  ];
+
+  $items['admin/config/abms/acuity_sn/help'] = [
+    'title' => 'Acuity Serial Number Generator Help',
+    'page callback' => 'acuity_sn_help_page',
+    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => ['administer site configuration'],
   ];
 
   return $items;
 }
+
+function acuity_sn_peek_next_number($group) {
+  $config = config('acuity_sn.serials');
+  $all = $config->get();
+  if (!isset($all[$group])) {
+    return NULL;
+  }
+
+  $group_data = $all[$group];
+  return max($group_data['next'], $group_data['min']);
+}
+
+function acuity_sn_format_number($group_data, $number) {
+  return $group_data['prefix']
+       . str_pad($number, $group_data['padding'], '0', STR_PAD_LEFT)
+       . $group_data['suffix'];
+}
+
+
+
