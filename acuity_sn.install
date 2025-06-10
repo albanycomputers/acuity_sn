@@ -1,24 +1,25 @@
 <?php
 
-/**
- * Implements hook_install().
- */
 function acuity_sn_install() {
-  // Start with a test serial group for development.
-  config_set('acuity_sn.serials', [
-    'test_serial' => [
-      'prefix' => 'T-',
-      'suffix' => '',
-      'padding' => 4,
-      'min' => 1,
-      'next' => 1,
-    ],
-  ]);
+  $config = config('acuity_sn.serials');
+  $config->set('test', [
+    'label' => 'Serial test',
+    'prefix' => 'T',
+    'suffix' => '',
+    'padding' => 5,
+    'next' => 1,
+  ])->save();
 }
 
-/**
- * Implements hook_uninstall().
- */
 function acuity_sn_uninstall() {
-  config_clear('acuity_sn.serials');
+  $config_directory = config_get_config_directory('active');
+  $file_path = $config_directory . '/acuity_sn.serials.json';
+
+  if (file_exists($file_path)) {
+    unlink($file_path);
+    watchdog('acuity_sn', 'Deleted config file %file during uninstall.', ['%file' => $file_path], WATCHDOG_NOTICE);
+  }
+  else {
+    watchdog('acuity_sn', 'Config file %file not found during uninstall.', ['%file' => $file_path], WATCHDOG_WARNING);
+  }
 }

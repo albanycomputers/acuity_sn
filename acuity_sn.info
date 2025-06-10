@@ -1,5 +1,20 @@
 name = Acuity Serial Number Generator
-description = Provides atomic, reusable serial number generation for Backdrop CMS modules.
+description = Stand alone module to provides atomic, auto-incrementing serial number generation widget for text fields and Title field
+
 type = module
-core = 1.x
-package = Acuity
+backdrop = 1.x
+package = Acuity BMS - Standalone Utilities
+
+maintainers[albancomputers] = Albany Computer Services
+
+stylesheets[all][] = css/acuity_sn.css
+;scripts[] = somescript.js
+
+tags[] = Appearance
+tags[] = Fields
+tags[] = User Interface
+tags[] = Utility
+
+;php = 8.0
+
+version = 1.0.4

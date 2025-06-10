@@ -1,0 +1,8 @@
+.abms-delete-link {
+  color: #a94442;
+  font-weight: bold;
+  text-decoration: none;
+}
+.abms-delete-link:hover {
+  text-decoration: underline;
+}
