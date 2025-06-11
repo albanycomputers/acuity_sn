@@ -28,26 +28,20 @@ function acuity_sn_help_section($section) {
 }
 
 /**
- * Help and support page for Acuity Serial Number Generator.
- */
-function acuity_sn_help_page() {
-  $output = [];
-
-  $output[] = '<h2>' . t('About this module') . '</h2>';
-  $output[] = '<p>' . t('The Acuity Serial Number Generator provides atomic, formatted serial numbers for use by other modules.') . '</p>';
-  $output[] = '<p>' . t('Serial groups are defined via config or by implementing <code>hook_acuity_sn_info()</code>.') . '</p>';
-  $output[] = '<p>' . t('This module is part of the Acuity suite, but can be used independently in other Backdrop CMS projects.') . '</p>';
-
-  return implode("\n", $output);
-}
-
-/**
- * Admin settings form for serial number groups.
- */
-/**
- * Admin settings table for serial number groups.
+ * Admin settings form for Acuity Serial Number Generator.
  */
 function acuity_sn_admin_form($form, &$form_state) {
+  // --- Serial number groups section ---
+  $form['groups_wrapper'] = [
+    '#type' => 'container',
+    '#attributes' => ['class' => ['acuity-sn-admin-section', 'acuity-sn-groups']],
+  ];
+
+  $form['groups_wrapper']['groups_description'] = [
+    '#markup' => '<h3>' . t('Serial number groups') . '</h3>' .
+                 '<p>' . t('These are your current serial number groups.') . '</p>',
+  ];
+
   $config = config('acuity_sn.serials');
   $groups = $config->get();
 
@@ -63,35 +57,86 @@ function acuity_sn_admin_form($form, &$form_state) {
   ];
 
   $rows = [];
-
   if (!empty($groups)) {
     foreach ($groups as $group_id => $group) {
       $rows[] = [
-        l(t('Edit'), "admin/config/abms/acuity_sn/edit/$group_id", ['attributes' => ['title' => t('Edit @group', ['@group' => $group_id])]]),
+        l(t('Edit'), "admin/config/abms/acuity_sn/edit/$group_id", [
+          'attributes' => ['title' => t('Edit @group', ['@group' => $group_id])],
+        ]),
         check_plain($group_id),
         check_plain($group['label'] ?? ''),
         check_plain($group['prefix'] ?? ''),
         check_plain($group['suffix'] ?? ''),
         check_plain($group['padding'] ?? ''),
         check_plain($group['next'] ?? ''),
-        l(t('Delete'), "admin/config/abms/acuity_sn/delete/$group_id", ['attributes' => ['class' => ['abms-delete-link']]]),
+        l(t('Delete'), "admin/config/abms/acuity_sn/delete/$group_id", [
+          'attributes' => ['class' => ['abms-delete-link']],
+        ]),
       ];
     }
   }
 
-  $form['groups_table'] = [
+  $form['groups_wrapper']['groups_table'] = [
     '#markup' => theme('table', ['header' => $header, 'rows' => $rows]),
   ];
 
-  $form['add'] = [
+  $form['groups_wrapper']['add'] = [
     '#type' => 'link',
     '#title' => t('Add new group'),
     '#href' => 'admin/config/abms/acuity_sn/add',
     '#attributes' => ['class' => ['button', 'button-action']],
   ];
 
+  // --- Title field assignments section ---
+  $form['title_assignments_wrapper'] = [
+    '#type' => 'container',
+    '#attributes' => ['class' => ['acuity-sn-admin-section', 'acuity-sn-title-assignments']],
+  ];
+
+  $form['title_assignments_wrapper']['description'] = [
+    '#markup' => '<h3>' . t('Title field assignments') . '</h3>' .
+                 '<p>' . t('These content types will have their Title field automatically populated with a serial number from the selected group.') . '</p>',
+  ];
+
+  $assignments = config_get('acuity_sn.title_assignment', 'assignments');
+  $header = [t('Content Type'), t('Serial Number Group')];
+  $rows = [];
+
+  if (!empty($assignments) && is_array($assignments)) {
+    foreach ($assignments as $type => $group) {
+      $rows[] = [
+        l(t('Edit'), "admin/config/abms/acuity_sn/edit-title/$type", [
+          'attributes' => ['title' => t('Edit title assignment for @type', ['@type' => $type])],
+        ]),
+        check_plain(node_type_get_name($type)),
+        check_plain($group),
+        l(t('Remove'), "admin/config/abms/acuity_sn/remove-title/$type", [
+          'attributes' => ['class' => ['abms-remove-link']],
+        ]),
+      ];
+    }
+
+    $form['title_assignments_wrapper']['table'] = [
+      '#markup' => theme('table', ['header' => [t('Edit'), t('Content Type'), t('Group ID'), t('Remove')], 'rows' => $rows]),
+    ];
+  }
+  else {
+    $form['title_assignments_wrapper']['empty'] = [
+      '#markup' => '<p><em>' . t('No title assignments yet.') . '</em></p>',
+    ];
+  }
+
+  $form['title_assignments_wrapper']['add'] = [
+    '#type' => 'markup',
+    '#markup' => l(t('Assign serial number to title'), 'admin/config/abms/acuity_sn/assign-title', [
+      'attributes' => ['class' => ['button', 'button-primary']],
+    ]),
+  ];
+
   return $form;
 }
+
+
 
 /**
  * Form to add or edit a serial number group.
@@ -313,3 +358,202 @@ function acuity_sn_group_usage_details($group_id) {
   return $usage;
 }
 
+/**
+ * Form for assigning a serial number group to a content type's title field.
+ */
+function acuity_sn_assign_title_form($form, &$form_state) {
+  // Load existing assignments.
+  $assignments = config_get('acuity_sn.title_assignment', 'assignments') ?? [];
+
+  // Get all content types.
+  $all_types = node_type_get_types();
+  $available_types = [];
+
+  foreach ($all_types as $type => $info) {
+    if (!isset($assignments[$type])) {
+      $available_types[$type] = $info->name;
+    }
+  }
+
+  if (empty($available_types)) {
+    backdrop_set_message(t('All content types are already assigned.'), 'warning');
+    backdrop_goto('admin/config/abms/acuity_sn');
+  }
+
+  // Load serial number groups.
+  $serial_groups = config_get('acuity_sn.serials') ?? [];
+  $group_options = [];
+
+  foreach ($serial_groups as $group_id => $settings) {
+    $group_options[$group_id] = $settings['label'] . ' (' . $group_id . ')';
+  }
+
+  $form['content_type'] = [
+    '#type' => 'select',
+    '#title' => t('Content type'),
+    '#options' => $available_types,
+    '#required' => TRUE,
+  ];
+
+  $form['serial_group'] = [
+    '#type' => 'select',
+    '#title' => t('Serial number group'),
+    '#options' => $group_options,
+    '#required' => TRUE,
+  ];
+
+  $form['actions'] = ['#type' => 'actions'];
+  $form['actions']['submit'] = [
+    '#type' => 'submit',
+    '#value' => t('Save assignment'),
+    '#button_type' => 'primary',
+  ];
+
+  return $form;
+}
+
+/**
+ * Form submit handler for acuity_sn_assign_title_form().
+ */
+function acuity_sn_assign_title_form_submit($form, &$form_state) {
+  $content_type = $form_state['values']['content_type'];
+  $group_id = $form_state['values']['serial_group'];
+
+  $config = config('acuity_sn.title_assignment');
+  $assignments = $config->get('assignments') ?? [];
+
+  $assignments[$content_type] = $group_id;
+  $config->set('assignments', $assignments)->save();
+
+  backdrop_set_message(t('Serial number group %group assigned to content type %type.', [
+    '%group' => $group_id,
+    '%type' => $content_type,
+  ]));
+
+  $form_state['redirect'] = 'admin/config/abms/acuity_sn';
+}
+
+
+/**
+ * Form to edit a title field serial number assignment.
+ *
+ * @param string $type
+ *   The machine name of the content type.
+ */
+function acuity_sn_edit_title_assignment_form($form, &$form_state, $type) {
+  $assignments = config_get('acuity_sn.title_assignment', 'assignments');
+  $current_group = $assignments[$type] ?? '';
+
+  // Load serial groups.
+  $groups = config_get('acuity_sn.serials');
+
+  $options = [];
+  foreach ($groups as $group_id => $group) {
+    $label = $group['label'] ?? $group_id;
+    $options[$group_id] = check_plain($label);
+  }
+
+  $form['type'] = [
+    '#type' => 'value',
+    '#value' => $type,
+  ];
+
+  $form['group'] = [
+    '#type' => 'select',
+    '#title' => t('Serial number group'),
+    '#options' => $options,
+    '#default_value' => $current_group,
+    '#required' => TRUE,
+  ];
+
+$form['actions'] = [
+  '#type' => 'actions',
+];
+
+$form['actions']['submit'] = [
+  '#type' => 'submit',
+  '#value' => t('Save assignment'),
+  '#button_type' => 'submit', // Keep this for the blue button
+];
+
+$form['actions']['cancel'] = [
+  '#type' => 'link',
+  '#title' => t('Cancel'),
+  '#href' => 'admin/config/abms/acuity_sn',
+  '#attributes' => ['class' => ['button', 'button-secondary']],
+];
+
+
+  return $form;
+}
+
+/**
+ * Submit handler for acuity_sn_edit_title_assignment_form().
+ */
+function acuity_sn_edit_title_assignment_form_submit($form, &$form_state) {
+  $type = $form_state['values']['type'];
+  $group = $form_state['values']['group'];
+
+  $config = config('acuity_sn.title_assignment');
+  $assignments = $config->get('assignments') ?? [];
+  $assignments[$type] = $group;
+  $config->set('assignments', $assignments)->save();
+
+  backdrop_set_message(t('The title assignment for %type has been updated.', ['%type' => $type]));
+  $form_state['redirect'] = 'admin/config/abms/acuity_sn';
+}
+
+/**
+ * Form callback to remove a title assignment for a content type.
+ */
+function acuity_sn_remove_title_assignment_form($form, &$form_state, $content_type = NULL) {
+  if (!$content_type) {
+    backdrop_set_message(t('Missing content type.'), 'error');
+    backdrop_goto('admin/config/abms/acuity_sn');
+  }
+
+  $assignments = config_get('acuity_sn.title_assignment', 'assignments');
+  if (empty($assignments[$content_type])) {
+    backdrop_set_message(t('No title assignment found for %type.', ['%type' => $content_type]), 'error');
+    backdrop_goto('admin/config/abms/acuity_sn');
+  }
+
+  $form['content_type'] = [
+    '#type' => 'value',
+    '#value' => $content_type,
+  ];
+
+  $form['message'] = [
+    '#markup' => '<p>' . t('Are you sure you want to remove the title assignment for the content type <strong>@type</strong>?', ['@type' => node_type_get_name($content_type)]) . '</p>',
+  ];
+
+  $form['actions'] = [
+    '#type' => 'actions',
+    'submit' => [
+      '#type' => 'submit',
+      '#value' => t('Remove'),
+      '#submit' => ['acuity_sn_remove_title_assignment_form_submit'],
+      '#button_type' => 'submit',
+    ],
+    'cancel' => [
+      '#markup' => l(t('Cancel'), 'admin/config/abms/acuity_sn', ['attributes' => ['class' => ['button']]]),
+    ],
+  ];
+
+  return $form;
+}
+
+/**
+ * Submit handler for title assignment removal.
+ */
+function acuity_sn_remove_title_assignment_form_submit($form, &$form_state) {
+  $content_type = $form_state['values']['content_type'];
+  $config = config('acuity_sn.title_assignment');
+  $assignments = $config->get('assignments') ?: [];
+
+  unset($assignments[$content_type]);
+  $config->set('assignments', $assignments)->save();
+
+  backdrop_set_message(t('Title assignment for %type has been removed.', ['%type' => node_type_get_name($content_type)]));
+  $form_state['redirect'] = 'admin/config/abms/acuity_sn';
+}

@@ -1,25 +1,39 @@
 <?php
 
 function acuity_sn_install() {
-  $config = config('acuity_sn.serials');
-  $config->set('test', [
+  config('acuity_sn.serials')->set('test', [
     'label' => 'Serial test',
     'prefix' => 'T',
     'suffix' => '',
     'padding' => 5,
     'next' => 1,
   ])->save();
+
+  // Creates an empty config file with no data.
+  config('acuity_sn.title_assignment')->save();
 }
 
 function acuity_sn_uninstall() {
   $config_directory = config_get_config_directory('active');
-  $file_path = $config_directory . '/acuity_sn.serials.json';
 
-  if (file_exists($file_path)) {
-    unlink($file_path);
-    watchdog('acuity_sn', 'Deleted config file %file during uninstall.', ['%file' => $file_path], WATCHDOG_NOTICE);
-  }
-  else {
-    watchdog('acuity_sn', 'Config file %file not found during uninstall.', ['%file' => $file_path], WATCHDOG_WARNING);
+  // config settings files to delete
+  // These files are created during the install process and should be removed
+  // during uninstall to clean up the configuration.
+  $files_to_delete = [
+    'acuity_sn.serials',
+    'acuity_sn.title_assignment',
+  ];
+
+  foreach ($files_to_delete as $config_name) {
+    $file_path = $config_directory . '/' . $config_name . '.json';
+
+    if (file_exists($file_path)) {
+      unlink($file_path);
+      watchdog('acuity_sn', 'Deleted config file %file during uninstall.', ['%file' => $file_path], WATCHDOG_NOTICE);
+    }
+    else {
+      watchdog('acuity_sn', 'Config file %file not found during uninstall.', ['%file' => $file_path], WATCHDOG_WARNING);
+    }
   }
 }
+

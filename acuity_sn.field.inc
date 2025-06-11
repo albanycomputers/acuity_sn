@@ -91,3 +91,4 @@ function acuity_sn_field_widget_settings_form($field, $instance) {
 
   return $form;
 }
+

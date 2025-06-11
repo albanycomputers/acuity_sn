@@ -6,6 +6,18 @@
  */
 
 /**
+ * RECOMMENDED INTEGRATION PATTERN:
+ *
+ * 1. Check existing groups:
+ *    $existing = acuity_sn_discover_groups();
+ *
+ * 2. Implement hook_acuity_sn_info() to define your group(s)
+ *
+ * 3. Call acuity_sn_register_discovered_groups() to persist them
+ */
+
+
+/**
  * Declare serial number groups provided by your module.
  *
  * Modules can implement this hook to define one or more serial number groups
